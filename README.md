@@ -15,7 +15,6 @@
 npm install
 npm run setup
 npm start
-# Okul Pano 1 
 ```
 
 ## Varsayılan Giriş Bilgileri
