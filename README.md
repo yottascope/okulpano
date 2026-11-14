@@ -20,6 +20,10 @@ npm start
 ## Varsayılan Giriş Bilgileri
 - **Yönetici Şifresi:** `1234` *(Yönetim panelindeki Ayarlar sekmesinden değiştirilebilir)*
 
+
+## İletişim
+- contact@yottascope.com
+
 ---
 
 ## Lisans
