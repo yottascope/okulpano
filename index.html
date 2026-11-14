@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#090d16">
+    <meta name="description" content="Pardus ETAP Akıllı Tahta Okul Dijital Pano ve Zil Sayacı Sistemi">
+    <title>Okul Pano</title>
+
+    <link rel="stylesheet" href="./vendor/fonts.css">
+    <link rel="stylesheet" href="./vendor/tailwind.css">
+    <script src="./vendor/lucide.min.js"></script>
+
+    <style>
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #070b14;
+            color: #f8fafc;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .board-ambient {
+            background:
+                radial-gradient(circle at 12% 15%, rgba(56, 189, 248, 0.10) 0%, transparent 42%),
+                radial-gradient(circle at 88% 85%, rgba(239, 68, 68, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.95) 0%, #060911 100%);
+        }
+
+        .glass-panel {
+            background: linear-gradient(160deg, rgba(22, 32, 54, 0.78) 0%, rgba(11, 17, 30, 0.88) 100%);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.55);
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.35); border-radius: 9999px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.28); border-radius: 9999px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.55); }
+
+        @keyframes marqueeLoop {
+            0% { transform: translateX(0%); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .marquee-track {
+            display: inline-flex;
+            white-space: nowrap;
+            will-change: transform;
+            animation: marqueeLoop var(--marquee-duration, 24s) linear infinite;
+        }
+        .marquee-track:hover { animation-play-state: paused; }
+
+        .thumb-active {
+            border-color: #38bdf8 !important;
+            background: rgba(56, 189, 248, 0.14) !important;
+            box-shadow: 0 0 20px -4px rgba(56, 189, 248, 0.45);
+        }
+
+        .slide-fade {
+            transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1), transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* ============ ON-SCREEN KEYBOARD ============ */
+        .osk {
+            display: none;
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            z-index: 9999;
+            padding: 10px 14px 14px;
+            background: linear-gradient(160deg, rgba(22, 32, 54, 0.98) 0%, rgba(11, 17, 30, 0.99) 100%);
+            border-top: 1px solid rgba(148, 163, 184, 0.28);
+            box-shadow: 0 -14px 40px rgba(0, 0, 0, 0.6);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        .osk.open { display: block; animation: oskUp 0.18s ease-out; }
+        @keyframes oskUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+        .osk-row {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin: 0 auto 6px;
+            max-width: 1280px;
+        }
+        .osk-key {
+            flex: 1 1 0;
+            min-width: 0;
+            max-width: 96px;
+            height: clamp(46px, 6.4vh, 68px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: rgba(255, 255, 255, 0.07);
+            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 700;
+            font-size: clamp(17px, 2.4vh, 24px);
+            cursor: pointer;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .osk-key.wide { flex: 1.5 1 0; max-width: 140px; }
+        .osk-key.space { flex: 6 1 0; max-width: none; font-size: clamp(13px, 1.8vh, 17px); color: #94a3b8; }
+        .osk-key.accent { background: rgba(56, 189, 248, 0.2); border-color: rgba(56, 189, 248, 0.5); color: #bae6fd; }
+        .osk-key.on { background: rgba(56, 189, 248, 0.35); border-color: #38bdf8; }
+        .osk-key.caps { box-shadow: inset 0 -4px 0 #38bdf8; }
+        .osk-key.pressed { background: rgba(56, 189, 248, 0.5); border-color: #38bdf8; transform: scale(0.97); }
+
+        /* ============ LIGHT THEME ============ */
+        html.light, html.light body { background-color: #eef2f7; color: #0f172a; }
+        html.light .board-ambient {
+            background:
+                radial-gradient(circle at 12% 15%, rgba(56, 189, 248, 0.16) 0%, transparent 42%),
+                radial-gradient(circle at 88% 85%, rgba(244, 63, 94, 0.08) 0%, transparent 45%),
+                linear-gradient(180deg, #f4f7fb 0%, #e6ecf4 100%);
+        }
+        html.light .glass-panel {
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.94) 0%, rgba(241, 245, 249, 0.96) 100%);
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            box-shadow: 0 10px 28px -10px rgba(15, 23, 42, 0.22);
+        }
+        html.light .glass-panel.slide-stage { background: #dde4ee !important; }
+        html.light #login-modal, html.light #admin-modal { background-color: rgba(15, 23, 42, 0.45); }
+        html.light .custom-scroll::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.06); }
+        html.light .custom-scroll::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.28); }
+        html.light .thumb-active { background: rgba(14, 165, 233, 0.12) !important; border-color: #0284c7 !important; }
+        html.light .osk { background: linear-gradient(160deg, rgba(255,255,255,0.99), rgba(236,241,248,0.99)); border-top-color: rgba(15,23,42,0.18); box-shadow: 0 -12px 32px rgba(15,23,42,0.2); }
+        html.light .osk-key { background: #ffffff; color: #0f172a; border-color: rgba(15,23,42,0.18); }
+        html.light .osk-key.space { color: #64748b; }
+        html.light .osk-key.accent { background: rgba(14,165,233,0.14); color: #0369a1; border-color: rgba(14,165,233,0.45); }
+        html.light .osk-key.on, html.light .osk-key.pressed { background: rgba(14,165,233,0.3); }
+        html.light .text-white:not(.on-media) { color: #0f172a; }
+        html.light .text-slate-100:not(.on-media) { color: #1e293b; }
+        html.light .text-slate-200:not(.on-media) { color: #1e293b; }
+        html.light .text-slate-300:not(.on-media) { color: #334155; }
+        html.light .text-slate-400:not(.on-media) { color: #475569; }
+        html.light .text-slate-500:not(.on-media) { color: #64748b; }
+        html.light .text-sky-200:not(.on-media) { color: #075985; }
+        html.light .text-sky-300:not(.on-media) { color: #0369a1; }
+        html.light .text-sky-300\/90:not(.on-media) { color: #0369a1; }
+        html.light .text-sky-400:not(.on-media) { color: #0284c7; }
+        html.light .text-amber-200:not(.on-media) { color: #92400e; }
+        html.light .text-amber-300:not(.on-media) { color: #b45309; }
+        html.light .text-amber-400:not(.on-media) { color: #b45309; }
+        html.light .text-emerald-200:not(.on-media) { color: #047857; }
+        html.light .text-emerald-400:not(.on-media) { color: #059669; }
+        html.light .text-rose-200:not(.on-media) { color: #be123c; }
+        html.light .text-rose-300:not(.on-media) { color: #be123c; }
+        html.light .text-rose-400:not(.on-media) { color: #e11d48; }
+        html.light .hover\:text-white:hover:not(.on-media) { color: #020617; }
+        html.light .hover\:text-sky-300:hover:not(.on-media) { color: #0369a1; }
+        html.light .hover\:text-sky-400:hover:not(.on-media) { color: #0369a1; }
+        html.light .hover\:text-amber-200:hover:not(.on-media) { color: #92400e; }
+        html.light .hover\:text-rose-300:hover:not(.on-media) { color: #9f1239; }
+        html.light .bg-slate-950:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-950\/45:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-950\/50:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-950\/55:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-950\/70:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-950\/75:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-950\/80:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-950\/85:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-950\/90:not(.on-media) { background-color: rgba(255, 255, 255, 0.82); }
+        html.light .bg-slate-900:not(.on-media) { background-color: rgba(241, 245, 249, 0.92); }
+        html.light .bg-slate-900\/60:not(.on-media) { background-color: rgba(241, 245, 249, 0.92); }
+        html.light .bg-slate-900\/70:not(.on-media) { background-color: rgba(241, 245, 249, 0.92); }
+        html.light .hover\:bg-slate-900:hover:not(.on-media) { background-color: #e2e8f0; }
+        html.light .bg-white\/5:not(.on-media) { background-color: rgba(15, 23, 42, .05); }
+        html.light .bg-white\/10:not(.on-media) { background-color: rgba(15, 23, 42, .08); }
+        html.light .hover\:bg-white\/10:hover:not(.on-media) { background-color: rgba(15, 23, 42, .10); }
+        html.light .hover\:bg-white\/15:hover:not(.on-media) { background-color: rgba(15, 23, 42, .14); }
+        html.light .border-white\/10:not(.on-media) { border-color: rgba(15, 23, 42, .12); }
+        html.light .border-white\/15:not(.on-media) { border-color: rgba(15, 23, 42, .18); }
+        html.light .hover\:border-white\/25:hover:not(.on-media) { border-color: rgba(15, 23, 42, .3); }
+    </style>
+</head>
+<body class="board-ambient flex flex-col justify-between p-3 sm:p-4 lg:p-5 gap-3 lg:gap-4">
+
+    <!-- ==================== 1. TOP HEADER BAR ==================== -->
+    <header class="glass-panel rounded-2xl px-4 py-2.5 lg:px-6 lg:py-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3.5 lg:gap-4 min-w-0">
+            <div id="school-logo-container" class="w-12 h-12 lg:w-14 lg:h-14 shrink-0 flex items-center justify-center">
+                <svg id="default-school-svg" class="w-12 h-12 lg:w-14 lg:h-14 text-sky-400" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M32 6L10 15V31C10 45.5 19.4 58.6 32 62C44.6 58.6 54 45.5 54 31V15L32 6Z" fill="currentColor" fill-opacity="0.14" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+                    <path d="M29.5 22C24.8 22 21 25.8 21 30.5C21 35.2 24.8 39 29.5 39C31.7 39 33.7 38.2 35.2 36.8C33.1 37.5 30.7 36.8 29.3 35C27.5 32.7 27.9 29.3 30.2 27.5C31.6 26.4 33.5 26 35.2 26.5C33.7 23.8 31.8 22 29.5 22Z" fill="currentColor"/>
+                    <polygon points="39,27 40.2,29.6 43,30 41,31.9 41.5,34.7 39,33.3 36.5,34.7 37,31.9 35,30 37.8,29.6" fill="currentColor"/>
+                    <path d="M20 45C24 43.5 28.5 44 32 46C35.5 44 40 43.5 44 45" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+                <img id="custom-school-logo" src="" alt="Okul Logosu" class="hidden w-full h-full object-contain">
+            </div>
+
+            <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-[11px] lg:text-xs font-bold uppercase tracking-widest text-sky-400">T.C. Millî Eğitim Bakanlığı</span>
+                </div>
+                <h1 id="school-name-display" class="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-extrabold tracking-tight text-white truncate">
+                    Atatürk Anadolu Lisesi
+                </h1>
+            </div>
+        </div>
+
+        <!-- Top-Right: 3 Password-Protected Control Icons (Settings Gear, Window Toggle, Exit X) -->
+        <div class="flex items-center gap-2 lg:gap-2.5 shrink-0">
+            <div id="test-time-banner" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs font-bold">
+                <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Test Saati Aktif</span>
+            </div>
+
+            <!-- 1. Settings Gear Icon Only (Password Protected) -->
+            <button data-protected-action="admin" title="Yönetim Paneli (Şifre Gerekli)" class="p-2.5 lg:p-3 rounded-xl bg-white/5 hover:bg-sky-500/15 active:scale-95 text-slate-400 hover:text-sky-300 border border-white/10 hover:border-sky-400/30 transition">
+                <i data-lucide="settings" class="w-4 h-4 lg:w-5 lg:h-5"></i>
+            </button>
+
+            <!-- 2. Minimize / Maximize Toggle (Password Protected) -->
+            <button data-protected-action="toggle-window" title="Küçült / Tam Ekran (Şifre Gerekli)" class="p-2.5 lg:p-3 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 text-slate-400 hover:text-white border border-white/10 transition">
+                <i data-lucide="maximize-2" class="w-4 h-4 lg:w-5 lg:h-5"></i>
+            </button>
+
+            <!-- 3. Exit X Button (Password Protected) -->
+            <button data-protected-action="exit-app" title="Uygulamadan Çık (Şifre Gerekli)" class="p-2.5 lg:p-3 rounded-xl bg-white/5 hover:bg-rose-500/20 active:scale-95 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-400/30 transition">
+                <i data-lucide="x" class="w-4 h-4 lg:w-5 lg:h-5"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ==================== 2. MIDDLE SPLIT SECTION ==================== -->
+    <main class="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 lg:gap-4">
+        <section class="relative flex-1 lg:w-[72%] h-full min-h-0 glass-panel slide-stage rounded-2xl overflow-hidden group flex items-center justify-center bg-slate-950/90">
+            <img id="main-slide-image" src="" alt="Okul Pano Görseli" class="relative z-10 w-full h-full object-contain slide-fade">
+
+            <div id="empty-slide-state" class="hidden absolute inset-0 z-10 flex-col items-center justify-center gap-3 text-center px-6">
+                <div class="p-5 rounded-3xl bg-white/5 border border-white/10 text-sky-400"><i data-lucide="image-plus" class="w-12 h-12"></i></div>
+                <h2 class="text-xl lg:text-3xl font-extrabold text-white">Fotoğraf bekleniyor</h2>
+                <p class="text-sm lg:text-base text-slate-400 max-w-md">Yönetim panelinden yeni görsel yükleyin. Yüklenen görseller burada otomatik yayınlanır.</p>
+            </div>
+
+            <div class="on-media absolute top-3.5 left-3.5 z-20 px-3 py-1 rounded-full bg-slate-950/75 backdrop-blur-md border border-white/15 text-xs font-mono font-bold text-slate-200 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                <span id="slide-counter-text">0 / 0</span>
+            </div>
+
+            <button id="toggle-play-btn" title="Slayt Otomatik Geçişi Duraklat/Başlat" class="on-media absolute top-3.5 right-3.5 z-20 p-2 rounded-full bg-slate-950/75 hover:bg-slate-900 backdrop-blur-md border border-white/15 text-slate-200 hover:text-sky-400 transition">
+                <i id="play-pause-icon" data-lucide="pause" class="w-4 h-4"></i>
+            </button>
+
+            <button id="prev-slide-btn" aria-label="Önceki Fotoğraf" class="on-media absolute left-3 top-1/2 -translate-y-1/2 z-20 p-3 rounded-2xl bg-slate-950/70 hover:bg-sky-500/80 text-white border border-white/15 backdrop-blur-md opacity-70 lg:opacity-0 lg:group-hover:opacity-100 transition active:scale-95">
+                <i data-lucide="chevron-left" class="w-6 h-6"></i>
+            </button>
+            <button id="next-slide-btn" aria-label="Sonraki Fotoğraf" class="on-media absolute right-3 top-1/2 -translate-y-1/2 z-20 p-3 rounded-2xl bg-slate-950/70 hover:bg-sky-500/80 text-white border border-white/15 backdrop-blur-md opacity-70 lg:opacity-0 lg:group-hover:opacity-100 transition active:scale-95">
+                <i data-lucide="chevron-right" class="w-6 h-6"></i>
+            </button>
+
+            <div id="slide-caption-wrapper" class="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-transparent pt-10 pb-4 px-5 lg:px-7">
+                <p id="slide-caption-text" class="on-media text-base sm:text-lg lg:text-xl font-bold text-white drop-shadow-sm line-clamp-2"></p>
+            </div>
+
+            <div class="absolute inset-x-0 bottom-0 h-1 bg-white/10 z-30">
+                <div id="slide-progress-bar" class="h-full bg-gradient-to-r from-sky-400 to-indigo-400 w-0 transition-none"></div>
+            </div>
+        </section>
+
+        <aside class="lg:w-[28%] h-36 lg:h-full min-h-0 glass-panel rounded-2xl p-3 flex flex-col shrink-0">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/10 shrink-0 px-1">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="images" class="w-4 h-4 text-sky-400"></i>
+                    <h2 class="text-xs lg:text-sm font-bold uppercase tracking-wider text-slate-200">Pano Galerisi</h2>
+                </div>
+                <span id="gallery-total-badge" class="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white/10 text-sky-300">2 Görsel</span>
+            </div>
+
+            <div id="thumbnail-list" class="flex-1 min-h-0 flex lg:flex-col gap-2.5 overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto custom-scroll pr-0.5"></div>
+        </aside>
+    </main>
+
+    <!-- ==================== 3. BOTTOM FOOTER BAR ==================== -->
+    <footer class="glass-panel rounded-2xl p-2.5 lg:px-5 lg:py-3 grid grid-cols-1 lg:grid-cols-12 gap-2.5 lg:gap-4 items-center shrink-0">
+        <div class="lg:col-span-3 flex items-center justify-between lg:justify-start gap-3 bg-slate-950/55 border border-white/10 rounded-xl px-3.5 py-2">
+            <div class="p-2 rounded-lg bg-sky-500/15 border border-sky-400/25 text-sky-400 hidden sm:flex">
+                <i data-lucide="calendar-clock" class="w-5 h-5 lg:w-6 lg:h-6"></i>
+            </div>
+            <div class="min-w-0">
+                <div id="live-clock" class="font-mono text-2xl sm:text-3xl lg:text-[28px] xl:text-3xl font-extrabold tracking-tight text-white leading-none">08:30:00</div>
+                <div id="live-date" class="text-xs lg:text-sm font-semibold text-sky-300/90 mt-1 truncate">12 Kasım 2026 Perşembe</div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-5 h-full flex items-center bg-slate-950/55 border border-white/10 rounded-xl px-3.5 py-2.5 overflow-hidden relative">
+            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-extrabold uppercase tracking-wider shrink-0 mr-3 z-10">
+                <i data-lucide="megaphone" class="w-3.5 h-3.5"></i>
+                <span>Duyuru</span>
+            </div>
+            <div id="announcement-viewport" class="flex-1 min-w-0 overflow-hidden relative flex items-center">
+                <div id="announcement-content" class="w-full text-sm lg:text-base font-semibold text-slate-100"></div>
+            </div>
+        </div>
+
+        <div id="bell-card" class="lg:col-span-4 flex items-center justify-between gap-3 bg-gradient-to-r from-slate-950/70 to-indigo-950/50 border border-indigo-400/25 rounded-xl px-3.5 py-2 transition-opacity">
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                    <span id="bell-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                    <span id="current-period-label" class="text-xs lg:text-sm font-extrabold text-white truncate">1. Ders İşleniyor</span>
+                </div>
+                <div id="next-bell-label" class="text-[11px] lg:text-xs font-medium text-slate-300 mt-0.5 truncate">Sonraki: 1. Teneffüs (09:10)</div>
+            </div>
+
+            <div class="text-right shrink-0 bg-slate-950/80 border border-white/10 rounded-lg px-3 py-1.5">
+                <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400 leading-none mb-0.5">Kalan Süre</div>
+                <div id="bell-countdown" class="font-mono text-xl sm:text-2xl lg:text-[26px] font-extrabold text-amber-400 leading-none tracking-tight">00:00</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ==================== 4. TEACHER PASSWORD GATE MODAL ==================== -->
+    <div id="login-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        <div class="glass-panel w-full max-w-md rounded-2xl p-6 border border-white/15 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2.5 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-400/30">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 id="login-modal-title" class="text-lg font-extrabold text-white">Öğretmen Yetki Doğrulaması</h3>
+                    </div>
+                </div>
+                <button id="close-login-btn" class="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="admin-password-input" class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">Yönetici Şifresi</label>
+                    <input type="password" id="admin-password-input" autocomplete="off" placeholder="••••" class="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 focus:border-sky-400 focus:outline-none text-white font-mono text-lg tracking-widest">
+                    <p id="login-error-msg" class="hidden text-xs font-semibold text-rose-400 mt-1.5">Hatalı şifre! Lütfen tekrar deneyin.</p>
+                </div>
+
+                <div class="flex justify-end gap-2.5 pt-1">
+                    <button type="button" id="cancel-login-btn" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-sm font-semibold text-slate-300 transition">Vazgeç</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-extrabold transition shadow-lg shadow-sky-500/25">Onayla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== 5. TEACHER ADMIN DASHBOARD MODAL ==================== -->
+    <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 sm:p-5">
+        <div class="glass-panel w-full max-w-5xl h-[90vh] rounded-2xl border border-white/15 shadow-2xl flex flex-col overflow-hidden">
+            <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between bg-slate-900/60 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-400/30">
+                        <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                    </div>
+                    <h2 class="text-lg font-extrabold text-white">Okul Dijital Pano Yönetim Paneli</h2>
+                </div>
+                <button id="close-admin-btn" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 text-xs font-bold transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                    <span>Paneli Kapat</span>
+                </button>
+            </div>
+
+            <div id="default-pass-banner" class="hidden items-center gap-2.5 px-5 py-2.5 bg-amber-500/15 border-b border-amber-400/30 text-amber-200 text-xs sm:text-sm font-bold shrink-0">
+                <i data-lucide="triangle-alert" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span>Varsayılan şifre (1234) kullanılıyor. Lütfen aşağıdaki "Yeni Şifre" alanından değiştirip kaydedin.</span>
+            </div>
+
+            <div class="flex border-b border-white/10 bg-slate-950/50 px-4 pt-2 gap-2 shrink-0 overflow-x-auto">
+                <button data-tab="photos" class="admin-tab-btn active-tab px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold border-b-2 border-sky-400 text-sky-300 bg-sky-500/10 flex items-center gap-2">
+                    <i data-lucide="image-plus" class="w-4 h-4"></i>
+                    <span>Fotoğraf Galerisi</span>
+                </button>
+                <button data-tab="announcements" class="admin-tab-btn px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2">
+                    <i data-lucide="megaphone" class="w-4 h-4"></i>
+                    <span>Duyurular</span>
+                </button>
+                <button data-tab="settings" class="admin-tab-btn px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span>Okul & Zil Programı Ayarları</span>
+                </button>
+            </div>
+
+            <div class="flex-1 min-h-0 overflow-y-auto custom-scroll p-5">
+                <!-- TAB 1: PHOTOS -->
+                <div id="tab-photos" class="admin-tab-panel space-y-5">
+                    <div class="p-4 rounded-2xl bg-slate-900/70 border border-dashed border-sky-400/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div class="flex items-center gap-3.5">
+                            <div class="p-3 rounded-xl bg-sky-500/15 text-sky-400">
+                                <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-extrabold text-white">Yeni Fotoğraf / Afiş Yükle (IndexedDB)</h3>
+                            </div>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+                            <input type="text" id="new-photo-caption" placeholder="Fotoğraf açıklaması..." class="px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-xs sm:text-sm text-white focus:border-sky-400 focus:outline-none">
+                            <label class="cursor-pointer px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs sm:text-sm font-extrabold text-center transition shrink-0">
+                                <span>Dosya Seç</span>
+                                <input type="file" id="photo-upload-input" accept="image/*" multiple class="hidden">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="admin-toast" class="hidden px-4 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-xs font-bold"></div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-300">Yayındaki Görseller (<span id="admin-photo-count">0</span>)</h4>
+                        </div>
+                        <div id="admin-photos-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: ANNOUNCEMENTS -->
+                <div id="tab-announcements" class="admin-tab-panel hidden space-y-5">
+                    <form id="add-announcement-form" class="p-4 rounded-2xl bg-slate-900/70 border border-white/10 space-y-3">
+                        <label class="block text-xs font-extrabold uppercase tracking-wider text-amber-300">Yeni Duyuru Ekle</label>
+                        <div class="flex flex-col sm:flex-row gap-2.5">
+                            <input type="text" id="new-announcement-input" required placeholder="Duyuru metni..." class="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-sm text-white focus:border-amber-400 focus:outline-none">
+                            <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-extrabold transition shrink-0">Yayınla</button>
+                        </div>
+                    </form>
+
+                    <div class="space-y-2.5">
+                        <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-300">Aktif Duyurular</h4>
+                        <div id="admin-announcements-list" class="space-y-2"></div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: SETTINGS & EDITABLE BELL SCHEDULE -->
+                <div id="tab-settings" class="admin-tab-panel hidden space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="p-4 rounded-2xl bg-slate-900/70 border border-white/10 space-y-4">
+                            <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+                                <i data-lucide="school" class="w-4 h-4 text-sky-400"></i>
+                                <span>Okul Kimliği ve Slayt Süresi</span>
+                            </h3>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-300 mb-1">Okul Adı</label>
+                                <input type="text" id="setting-school-name" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-white/15 text-sm text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-300 mb-1">Okul Logosu Yükle</label>
+                                <div class="flex items-center gap-2">
+                                    <label class="cursor-pointer px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition">
+                                        <span>Logo Seç</span>
+                                        <input type="file" id="setting-logo-input" accept="image/*" class="hidden">
+                                    </label>
+                                    <button type="button" id="reset-logo-btn" class="px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-xs font-semibold text-rose-300">Varsayılan Arma</button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-300 mb-1">Slayt Süresi (Sn)</label>
+                                    <input type="number" id="setting-slide-interval" min="3" max="120" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-white/15 text-sm text-white font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-300 mb-1">Yeni Şifre</label>
+                                    <input type="password" autocomplete="new-password" id="setting-admin-pass" class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-white/15 text-sm text-white font-mono">
+                                </div>
+                            </div>
+                            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                                <input type="checkbox" id="setting-osk" class="w-4 h-4 accent-sky-400">
+                                <span class="text-xs font-bold text-slate-300">Ekran klavyesini kullan (dokunmatik tahta)</span>
+                            </label>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-300 mb-1">Tema</label>
+                                <div class="flex gap-2">
+                                    <button type="button" data-theme-btn="dark"><i data-lucide="moon" class="w-4 h-4"></i><span>Koyu</span></button>
+                                    <button type="button" data-theme-btn="light"><i data-lucide="sun" class="w-4 h-4"></i><span>Açık</span></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-4 rounded-2xl bg-slate-900/70 border border-white/10 space-y-3">
+                            <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+                                <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
+                                <span>Zil Sayacı Test Modu</span>
+                            </h3>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <select id="sim-day-input" class="px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-xs sm:text-sm text-white font-semibold focus:border-amber-400 focus:outline-none">
+                                    <option value="1">Pazartesi (Hafta İçi)</option>
+                                    <option value="5">Cuma (Hafta Sonu Geçişi)</option>
+                                    <option value="6">Cumartesi (Hafta Sonu)</option>
+                                </select>
+                                <input type="text" id="sim-time-input" inputmode="numeric" maxlength="8" placeholder="SS:DD:SS" value="09:15:00" class="px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-xs sm:text-sm text-white font-mono">
+                                <button type="button" id="apply-sim-time-btn" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold transition">Saati Uygula</button>
+                                <button type="button" id="reset-sim-time-btn" class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-slate-200 transition">Gerçek Saat</button>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span class="text-[11px] font-semibold text-slate-400 mr-1">Hızlı Test:</span>
+                                <button type="button" data-sim-preset="1|09:15:00" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-200 border border-white/10 text-[11px] font-bold transition">Pzt 09:15 (Teneffüs)</button>
+                                <button type="button" data-sim-preset="5|16:59:50" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-200 border border-white/10 text-[11px] font-bold transition">Cuma 16:59:50 (Çıkışa 10sn)</button>
+                                <button type="button" data-sim-preset="6|12:00:00" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-amber-500/20 text-slate-300 hover:text-amber-200 border border-white/10 text-[11px] font-bold transition">Cumartesi (Kapalı)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Editable Bell Schedule JSON -->
+                    <div class="p-4 rounded-2xl bg-slate-900/70 border border-white/10 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+                                <i data-lucide="bell" class="w-4 h-4 text-sky-400"></i>
+                                <span>Zil Saatleri Programı (Düzenlenebilir JSON)</span>
+                            </h3>
+                            <button type="button" id="reset-bell-schedule-btn" class="text-xs text-slate-400 hover:text-sky-300 underline">Varsayılan Zil Saatlerine Dön</button>
+                        </div>
+                        <textarea id="setting-bell-json" rows="7" spellcheck="false" class="w-full p-3 rounded-xl bg-slate-950 border border-white/15 text-xs text-sky-200 font-mono focus:border-sky-400 focus:outline-none custom-scroll"></textarea>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="button" id="save-settings-btn" class="px-6 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-extrabold transition shadow-lg shadow-sky-500/25">
+                            Tüm Ayarları Kaydet
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== APPLICATION LOGIC ==================== -->
+    <script>
+        const DEFAULT_ANNOUNCEMENTS = [
+            "Okulumuza hoş geldiniz! Tüm öğrencilerimize ve öğretmenlerimize verimli bir ders günü dileriz.",
+            "Nöbetçi öğretmen ve öğrenci listesi öğretmenler odası panosunda güncellenmiştir."
+        ];
+
+        const DEFAULT_BELL_SCHEDULE = [
+            { time: "08:30", period: "1. Ders İşleniyor", nextEvent: "1. Teneffüs", type: "lesson" },
+            { time: "09:10", period: "1. Teneffüs", nextEvent: "Öğrenci Zili", type: "break" },
+            { time: "09:18", period: "Öğrenci Zili (Sınıflara)", nextEvent: "Öğretmen Zili & 2. Ders", type: "warning" },
+            { time: "09:20", period: "2. Ders İşleniyor", nextEvent: "2. Teneffüs", type: "lesson" },
+            { time: "10:00", period: "2. Teneffüs", nextEvent: "Öğrenci Zili", type: "break" },
+            { time: "10:08", period: "Öğrenci Zili (Sınıflara)", nextEvent: "Öğretmen Zili & 3. Ders", type: "warning" },
+            { time: "10:10", period: "3. Ders İşleniyor", nextEvent: "3. Teneffüs", type: "lesson" },
+            { time: "10:50", period: "3. Teneffüs", nextEvent: "Öğrenci Zili", type: "break" },
+            { time: "10:58", period: "Öğrenci Zili (Sınıflara)", nextEvent: "Öğretmen Zili & 4. Ders", type: "warning" },
+            { time: "11:00", period: "4. Ders İşleniyor", nextEvent: "4. Teneffüs", type: "lesson" },
+            { time: "11:40", period: "4. Teneffüs", nextEvent: "Öğrenci Zili", type: "break" },
+            { time: "11:48", period: "Öğrenci Zili (Sınıflara)", nextEvent: "Öğretmen Zili & 5. Ders", type: "warning" },
+            { time: "11:50", period: "5. Ders İşleniyor", nextEvent: "Öğle Arası", type: "lesson" },
+            { time: "12:30", period: "Öğle Arası", nextEvent: "Öğrenci Zili (6. Ders)", type: "break" },
+            { time: "12:58", period: "Öğrenci Zili (Sınıflara)", nextEvent: "Öğretmen Zili & 6. Ders", type: "warning" },
+            { time: "13:00", period: "6. Ders İşleniyor", nextEvent: "5. Teneffüs", type: "lesson" },
+            { time: "13:40", period: "5. Teneffüs", nextEvent: "Öğrenci Zili", type: "break" },
+            { time: "13:48", period: "Öğrenci Zili (Sınıflara)", nextEvent: "Öğretmen Zili & 7. Ders", type: "warning" },
+            { time: "13:50", period: "7. Ders İşleniyor", nextEvent: "6. Teneffüs", type: "lesson" },
+            { time: "14:30", period: "6. Teneffüs", nextEvent: "Öğrenci Zili", type: "break" },
+            { time: "14:38", period: "Öğrenci Zili (Sınıflara)", nextEvent: "Öğretmen Zili & 8. Ders", type: "warning" },
+            { time: "14:40", period: "8. Ders İşleniyor", nextEvent: "Çıkış / 7. Teneffüs", type: "lesson" },
+            { time: "15:30", period: "Çıkış / 7. Teneffüs", nextEvent: "Öğrenci Zili (9. Ders)", type: "break" },
+            { time: "15:33", period: "Öğrenci Zili (9. Ders)", nextEvent: "Öğretmen Zili & 9. Ders", type: "warning" },
+            { time: "15:35", period: "9. Ders İşleniyor", nextEvent: "Çıkış / 8. Teneffüs", type: "lesson" },
+            { time: "16:15", period: "Çıkış / 8. Teneffüs", nextEvent: "Öğrenci Zili (10. Ders)", type: "break" },
+            { time: "16:18", period: "Öğrenci Zili (10. Ders)", nextEvent: "10. Ders Başlangıcı", type: "warning" },
+            { time: "16:20", period: "10. Ders İşleniyor", nextEvent: "Okul Çıkışı", type: "lesson" },
+            { time: "17:00", period: "Okul Çıkışı (Dersler Bitti)", nextEvent: "Yarın İlk Ders (08:30)", type: "off" }
+        ];
+
+        /**
+         * INDEXEDDB PHOTO STORAGE (Avoids 5MB localStorage limit)
+         */
+        const IDB_NAME = 'okul_pano_media_db';
+        const IDB_STORE = 'photos';
+
+        function openMediaDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(IDB_NAME, 1);
+                req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function savePhotosToIDB(photos) {
+            const db = await openMediaDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(IDB_STORE, 'readwrite');
+                tx.objectStore(IDB_STORE).put(photos, 'gallery');
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        async function loadPhotosFromIDB() {
+            const db = await openMediaDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(IDB_STORE, 'readonly');
+                const req = tx.objectStore(IDB_STORE).get('gallery');
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            });
+        }
+
+        /**
+         * APP STATE
+         */
+        const STORAGE_KEY = 'okul_dijital_pano_meta_v2';
+        const DEFAULT_ADMIN_PASS = "1234";
+        let appState = loadMetaState();
+        let currentSlideIndex = 0;
+        let isPlaying = true;
+        let slideProgress = 0;
+        let pendingProtectedAction = null;
+        let simulatedBaseDate = null;
+        let simulatedSetAt = null;
+
+        const THEME_BTN_BASE = "flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-bold transition";
+        function applyTheme(theme) {
+            const light = theme === 'light';
+            const root = document.documentElement;
+            root.classList.toggle('light', light);
+            root.classList.toggle('dark', !light);
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', light ? '#eef2f7' : '#090d16');
+            document.querySelectorAll('[data-theme-btn]').forEach((b) => {
+                const on = b.dataset.themeBtn === (light ? 'light' : 'dark');
+                b.className = THEME_BTN_BASE + (on
+                    ? ' border-sky-400 bg-sky-500/20 text-sky-300'
+                    : ' border-white/15 bg-white/5 text-slate-300 hover:bg-white/10');
+            });
+        }
+        applyTheme(appState.theme);
+        document.querySelectorAll('[data-theme-btn]').forEach((b) => {
+            b.addEventListener('click', () => {
+                appState.theme = b.dataset.themeBtn;
+                applyTheme(appState.theme);
+                saveState();
+            });
+        });
+
+        function loadMetaState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const p = JSON.parse(raw);
+                    return {
+                        schoolName: p.schoolName || "Atatürk Anadolu Lisesi",
+                        schoolLogo: p.schoolLogo || "",
+                        adminPassword: p.adminPassword || DEFAULT_ADMIN_PASS,
+                        onScreenKeyboard: p.onScreenKeyboard !== false,
+                        theme: p.theme === 'light' ? 'light' : 'dark',
+                        slideInterval: Number(p.slideInterval) || 8,
+                        announcements: Array.isArray(p.announcements) ? p.announcements : [...DEFAULT_ANNOUNCEMENTS],
+                        bellSchedule: Array.isArray(p.bellSchedule) && p.bellSchedule.length >= 2 ? p.bellSchedule : [...DEFAULT_BELL_SCHEDULE],
+                        photos: []
+                    };
+                }
+            } catch (e) {}
+            return {
+                schoolName: "Atatürk Anadolu Lisesi",
+                schoolLogo: "",
+                adminPassword: DEFAULT_ADMIN_PASS,
+                onScreenKeyboard: true,
+                theme: 'dark',
+                slideInterval: 8,
+                announcements: [...DEFAULT_ANNOUNCEMENTS],
+                bellSchedule: [...DEFAULT_BELL_SCHEDULE],
+                photos: []
+            };
+        }
+
+        async function saveState() {
+            const { photos, ...metaOnly } = appState;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(metaOnly));
+            try {
+                await savePhotosToIDB(photos);
+            } catch (e) {
+                showAdminToast("Görseller kaydedilirken bir hata oluştu.", true);
+            }
+        }
+
+        /**
+         * RENDERING
+         */
+        function escapeHTML(str) {
+            return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function renderHeader() {
+            document.getElementById('school-name-display').textContent = appState.schoolName;
+            const customImg = document.getElementById('custom-school-logo');
+            const defaultSvg = document.getElementById('default-school-svg');
+            if (appState.schoolLogo) {
+                customImg.src = appState.schoolLogo;
+                customImg.classList.remove('hidden');
+                defaultSvg.classList.add('hidden');
+            } else {
+                customImg.classList.add('hidden');
+                defaultSvg.classList.remove('hidden');
+            }
+        }
+
+        function renderGallery() {
+            const photos = appState.photos;
+            const mainImg = document.getElementById('main-slide-image');
+            const captionWrapper = document.getElementById('slide-caption-wrapper');
+            const captionText = document.getElementById('slide-caption-text');
+
+            if (!photos.length) {
+                mainImg.src = '';
+                mainImg.style.opacity = '0';
+                document.getElementById('slide-counter-text').textContent = '0 / 0';
+                document.getElementById('gallery-total-badge').textContent = '0 Görsel';
+                document.getElementById('slide-progress-bar').style.width = '0%';
+                captionWrapper.classList.add('hidden');
+                document.getElementById('empty-slide-state').classList.remove('hidden');
+                document.getElementById('empty-slide-state').classList.add('flex');
+                renderThumbnails();
+                return;
+            }
+
+            document.getElementById('empty-slide-state').classList.add('hidden');
+            document.getElementById('empty-slide-state').classList.remove('flex');
+            if (currentSlideIndex >= photos.length) currentSlideIndex = 0;
+
+            const activePhoto = photos[currentSlideIndex];
+            mainImg.style.opacity = '0.35';
+            setTimeout(() => {
+                mainImg.src = activePhoto.url;
+                mainImg.style.opacity = '1';
+            }, 90);
+
+            document.getElementById('slide-counter-text').textContent = `${currentSlideIndex + 1} / ${photos.length}`;
+            document.getElementById('gallery-total-badge').textContent = `${photos.length} Görsel`;
+
+            if (activePhoto.caption && activePhoto.caption.trim() !== '') {
+                captionText.textContent = activePhoto.caption;
+                captionWrapper.classList.remove('hidden');
+            } else {
+                captionWrapper.classList.add('hidden');
+            }
+            renderThumbnails();
+        }
+
+        function renderThumbnails() {
+            const listEl = document.getElementById('thumbnail-list');
+            listEl.innerHTML = '';
+
+            if (!appState.photos.length) {
+                listEl.innerHTML = `<div class="w-full h-full flex items-center justify-center text-xs text-slate-500 text-center p-4">Galeri boş</div>`;
+                return;
+            }
+
+            appState.photos.forEach((photo, idx) => {
+                const isActive = idx === currentSlideIndex;
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = `group shrink-0 w-40 lg:w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition ${
+                    isActive ? 'thumb-active' : 'border-white/10 bg-slate-950/45 hover:bg-white/10 hover:border-white/25'
+                }`;
+                item.innerHTML = `
+                    <div class="relative w-16 h-12 lg:w-20 lg:h-14 rounded-lg overflow-hidden bg-slate-900 shrink-0 border border-white/10">
+                        <img src="${escapeHTML(photo.url)}" alt="" class="w-full h-full object-cover">
+                        <span class="absolute bottom-0.5 right-0.5 px-1.5 rounded bg-slate-950/85 text-[10px] font-mono font-bold text-white">${idx + 1}</span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-bold ${isActive ? 'text-sky-300' : 'text-slate-200'} line-clamp-2 leading-snug">
+                            ${escapeHTML(photo.caption || `Pano Görseli #${idx + 1}`)}
+                        </div>
+                        <div class="text-[10px] font-semibold mt-1 ${isActive ? 'text-sky-400' : 'text-slate-500'}">
+                            ${isActive ? '● Gösteriliyor' : 'Dokun'}
+                        </div>
+                    </div>
+                `;
+                item.addEventListener('click', () => {
+                    currentSlideIndex = idx;
+                    slideProgress = 0;
+                    renderGallery();
+                });
+                listEl.appendChild(item);
+                if (isActive) item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            });
+        }
+
+        function renderAnnouncements() {
+            const contentEl = document.getElementById('announcement-content');
+            const items = appState.announcements.filter(a => a && a.trim().length > 0);
+            if (!items.length) {
+                contentEl.className = "w-full text-center text-sm lg:text-base font-semibold text-slate-400 truncate";
+                contentEl.textContent = "Şu anda aktif bir duyuru bulunmamaktadır.";
+                return;
+            }
+            const combinedText = items.join("   ✦   ");
+            if (combinedText.length <= 65) {
+                contentEl.className = "w-full text-center text-sm lg:text-base font-bold text-slate-100 truncate";
+                contentEl.textContent = combinedText;
+            } else {
+                const durationSec = Math.max(14, Math.round(combinedText.length / 8));
+                contentEl.className = "marquee-track text-sm lg:text-base font-bold text-slate-100";
+                contentEl.style.setProperty('--marquee-duration', `${durationSec}s`);
+                const safeText = escapeHTML(combinedText);
+                contentEl.innerHTML = `<span class="pr-12">${safeText} &nbsp;&nbsp;&nbsp;✦&nbsp;&nbsp;&nbsp;</span><span class="pr-12">${safeText} &nbsp;&nbsp;&nbsp;✦&nbsp;&nbsp;&nbsp;</span>`;
+            }
+        }
+
+        /**
+         * CLOCK & DYNAMIC BELL SCHEDULE
+         */
+        const TR_MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+        const TR_DAYS = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+
+        function getCurrentNow() {
+            if (simulatedBaseDate && simulatedSetAt) {
+                return new Date(simulatedBaseDate.getTime() + (Date.now() - simulatedSetAt));
+            }
+            return new Date();
+        }
+
+        function parseTimeToTodayDate(baseDate, timeStr) {
+            const [hh, mm] = timeStr.split(':').map(Number);
+            const d = new Date(baseDate);
+            d.setHours(hh, mm, 0, 0);
+            return d;
+        }
+
+        function pad2(n) { return String(n).padStart(2, '0'); }
+
+        function updateClockAndBell() {
+            const now = getCurrentNow();
+            document.getElementById('live-clock').textContent = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+            document.getElementById('live-date').textContent = `${now.getDate()} ${TR_MONTHS[now.getMonth()]} ${now.getFullYear()} ${TR_DAYS[now.getDay()]}`;
+
+            const schedule = appState.bellSchedule;
+            const firstBell = parseTimeToTodayDate(now, schedule[0].time);
+            const lastBell = parseTimeToTodayDate(now, schedule[schedule.length - 1].time);
+
+            let currentStatus = "", nextBellName = "", targetDate = null, stateType = "off", isTimerOff = false;
+            const dow = now.getDay();
+            const isWeekend = dow === 0 || dow === 6;
+            const isFridayEnded = dow === 5 && now >= lastBell;
+
+            if (isWeekend || isFridayEnded) {
+                isTimerOff = true;
+                currentStatus = isFridayEnded ? "Hafta Sonu Tatili Başladı" : "Hafta Sonu (Zil Devre Dışı)";
+                nextBellName = `Pazartesi İlk Ders (${schedule[0].time})`;
+                stateType = "off";
+            } else if (now >= lastBell) {
+                currentStatus = "Okul Çıkışı (Dersler Bitti)";
+                nextBellName = `Yarın İlk Ders (${schedule[0].time})`;
+                targetDate = new Date(firstBell.getTime() + 86400000);
+            } else if (now < firstBell) {
+                currentStatus = "Ders Öncesi Hazırlık";
+                nextBellName = `1. Ders Başlangıcı (${schedule[0].time})`;
+                targetDate = firstBell;
+                stateType = "break";
+            } else {
+                for (let i = 0; i < schedule.length - 1; i++) {
+                    const start = parseTimeToTodayDate(now, schedule[i].time);
+                    const end = parseTimeToTodayDate(now, schedule[i + 1].time);
+                    if (now >= start && now < end) {
+                        currentStatus = schedule[i].period;
+                        nextBellName = `${schedule[i].nextEvent} (${schedule[i + 1].time})`;
+                        targetDate = end;
+                        stateType = schedule[i].type;
+                        break;
+                    }
+                }
+            }
+
+            document.getElementById('current-period-label').textContent = currentStatus;
+            document.getElementById('next-bell-label').textContent = `Sonraki: ${nextBellName}`;
+            const countdownEl = document.getElementById('bell-countdown');
+            const bellCardEl = document.getElementById('bell-card');
+
+            if (isTimerOff) {
+                countdownEl.textContent = "--:--";
+                bellCardEl.classList.add('opacity-60');
+            } else {
+                bellCardEl.classList.remove('opacity-60');
+                const totalSec = Math.floor(Math.max(0, targetDate - now) / 1000);
+                const hrs = Math.floor(totalSec / 3600);
+                const mins = Math.floor((totalSec % 3600) / 60);
+                const secs = totalSec % 60;
+                countdownEl.textContent = hrs > 0 ? `${pad2(hrs)}:${pad2(mins)}:${pad2(secs)}` : `${pad2(mins)}:${pad2(secs)}`;
+            }
+
+            const dotEl = document.getElementById('bell-status-dot');
+            const colorMap = {
+                lesson: ["bg-rose-500 animate-pulse", "text-sky-300"],
+                warning: ["bg-amber-400 animate-ping", "text-amber-400"],
+                break: ["bg-emerald-400 animate-pulse", "text-emerald-400"],
+                off: ["bg-slate-500", "text-slate-500"]
+            };
+            const [dotCls, txtCls] = colorMap[stateType] || colorMap.off;
+            dotEl.className = `w-2 h-2 rounded-full shrink-0 ${dotCls}`;
+            countdownEl.className = `font-mono text-xl sm:text-2xl lg:text-[26px] font-extrabold leading-none tracking-tight ${txtCls}`;
+        }
+
+        /**
+         * CLEAN SETINTERVAL SLIDESHOW LOOP
+         */
+        function startSlideshowLoop() {
+            setInterval(() => {
+                if (!isPlaying || appState.photos.length <= 1) return;
+                const interval = Math.max(3, appState.slideInterval || 8);
+                slideProgress += (0.1 / interval) * 100;
+                if (slideProgress >= 100) {
+                    slideProgress = 0;
+                    currentSlideIndex = (currentSlideIndex + 1) % appState.photos.length;
+                    renderGallery();
+                }
+                document.getElementById('slide-progress-bar').style.width = `${Math.min(100, slideProgress)}%`;
+            }, 100);
+        }
+
+        /**
+         * IMAGE COMPRESSION & ADMIN DASHBOARD
+         */
+        function compressImageFile(file, maxWidth = 1440, quality = 0.85) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let w = img.width, h = img.height;
+                        if (w > maxWidth) { h = Math.round((h * maxWidth) / w); w = maxWidth; }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w; canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function showAdminToast(msg, isError = false) {
+            const toast = document.getElementById('admin-toast');
+            toast.textContent = msg;
+            toast.className = isError
+                ? "px-4 py-2.5 rounded-xl bg-rose-500/20 border border-rose-400/30 text-rose-200 text-xs font-bold"
+                : "px-4 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-xs font-bold";
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3500);
+        }
+
+        function renderAdminDashboard() {
+            const grid = document.getElementById('admin-photos-grid');
+            document.getElementById('admin-photo-count').textContent = appState.photos.length;
+            grid.innerHTML = '';
+
+            if (!appState.photos.length) {
+                grid.innerHTML = `<div class="col-span-full text-center text-xs text-slate-400 py-8 rounded-xl bg-slate-950/50 border border-white/10">Yayında hiç görsel yok. Yukarıdan yeni fotoğraf yükleyebilir.</div>`;
+            }
+
+            appState.photos.forEach((photo, idx) => {
+                const card = document.createElement('div');
+                card.className = "rounded-xl bg-slate-950/80 border border-white/10 overflow-hidden flex flex-col";
+                const exampleBadge = '';
+
+                card.innerHTML = `
+                    <div class="relative h-36 bg-slate-900">
+                        <img src="${escapeHTML(photo.url)}" alt="" class="w-full h-full object-cover">
+                        <span class="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-slate-950/80 text-xs font-mono font-bold text-sky-300">#${idx + 1}</span>
+                        ${exampleBadge}
+                    </div>
+                    <div class="p-3 flex-1 flex flex-col justify-between gap-2.5">
+                        <input type="text" data-idx="${idx}" value="${escapeHTML(photo.caption || '')}" placeholder="Açıklama..." class="admin-caption-edit w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white focus:border-sky-400 focus:outline-none">
+                        <div class="flex items-center justify-between pt-1">
+                            <div class="flex gap-1">
+                                <button type="button" data-move="up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''} class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 text-slate-300"><i data-lucide="arrow-up" class="w-3.5 h-3.5"></i></button>
+                                <button type="button" data-move="down" data-idx="${idx}" ${idx === appState.photos.length - 1 ? 'disabled' : ''} class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 text-slate-300"><i data-lucide="arrow-down" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                            <button type="button" data-delete-photo="${idx}" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 text-xs font-bold transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Sil</span></button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            grid.querySelectorAll('.admin-caption-edit').forEach(inp => {
+                inp.addEventListener('change', (e) => {
+                    appState.photos[Number(e.target.dataset.idx)].caption = e.target.value.trim();
+                    saveState(); renderGallery();
+                });
+            });
+
+            grid.querySelectorAll('[data-move]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const i = Number(btn.dataset.idx);
+                    const target = btn.dataset.move === 'up' ? i - 1 : i + 1;
+                    if (target < 0 || target >= appState.photos.length) return;
+                    [appState.photos[i], appState.photos[target]] = [appState.photos[target], appState.photos[i]];
+                    saveState(); renderGallery(); renderAdminDashboard();
+                });
+            });
+
+            grid.querySelectorAll('[data-delete-photo]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    appState.photos.splice(Number(btn.dataset.deletePhoto), 1);
+                    saveState(); renderGallery(); renderAdminDashboard();
+                });
+            });
+
+            const annList = document.getElementById('admin-announcements-list');
+            annList.innerHTML = appState.announcements.length ? '' : `<div class="text-xs text-slate-500 italic p-3">Henüz duyuru eklenmemiş.</div>`;
+            appState.announcements.forEach((text, idx) => {
+                const row = document.createElement('div');
+                row.className = "flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/70 border border-white/10";
+                row.innerHTML = `<div class="text-xs sm:text-sm text-slate-200 flex-1">${escapeHTML(text)}</div><button type="button" data-del-ann="${idx}" class="p-2 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 transition shrink-0"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`;
+                annList.appendChild(row);
+            });
+
+            annList.querySelectorAll('[data-del-ann]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    appState.announcements.splice(Number(btn.dataset.delAnn), 1);
+                    saveState(); renderAnnouncements(); renderAdminDashboard();
+                });
+            });
+
+            document.getElementById('setting-school-name').value = appState.schoolName;
+            document.getElementById('setting-osk').checked = appState.onScreenKeyboard !== false;
+            document.getElementById('setting-slide-interval').value = appState.slideInterval;
+            document.getElementById('setting-admin-pass').value = '';
+            document.getElementById('setting-bell-json').value = JSON.stringify(appState.bellSchedule, null, 2);
+            lucide.createIcons();
+        }
+
+        function enforcePasswordChange() {
+            const banner = document.getElementById('default-pass-banner');
+            if (appState.adminPassword === DEFAULT_ADMIN_PASS) {
+                banner.classList.remove('hidden');
+                banner.classList.add('flex');
+                const settingsTab = document.querySelector('.admin-tab-btn[data-tab="settings"]');
+                if (settingsTab) settingsTab.click();
+                setTimeout(() => document.getElementById('setting-admin-pass').focus(), 80);
+            } else {
+                banner.classList.add('hidden');
+                banner.classList.remove('flex');
+            }
+        }
+
+        function executeProtectedAction(action) {
+            if (action === 'admin') {
+                renderAdminDashboard();
+                const adminModal = document.getElementById('admin-modal');
+                adminModal.classList.remove('hidden');
+                adminModal.classList.add('flex');
+                enforcePasswordChange();
+            } else if (action === 'toggle-window') {
+                if (window.electronAPI) {
+                    window.electronAPI.toggleWindow();
+                } else if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen().catch(() => {});
+                }
+            } else if (action === 'exit-app') {
+                if (window.electronAPI) {
+                    window.electronAPI.quitApp();
+                } else {
+                    window.close();
+                }
+            }
+        }
+
+        function applySimulatedClock(targetDow, timeStr) {
+            const [h, m, s] = timeStr.split(':').map(Number);
+            const d = new Date();
+            const diff = (targetDow - d.getDay() + 7) % 7;
+            d.setDate(d.getDate() + diff);
+            d.setHours(h || 0, m || 0, s || 0, 0);
+
+            simulatedBaseDate = d;
+            simulatedSetAt = Date.now();
+            const banner = document.getElementById('test-time-banner');
+            banner.querySelector('span').textContent = `Test: ${TR_DAYS[d.getDay()]} ${pad2(h)}:${pad2(m)}`;
+            banner.classList.remove('hidden');
+            banner.classList.add('inline-flex');
+            updateClockAndBell();
+        }
+
+        /**
+         * INITIALIZATION
+         */
+        document.addEventListener('DOMContentLoaded', async () => {
+            const savedPhotos = await loadPhotosFromIDB();
+            if (Array.isArray(savedPhotos)) {
+                appState.photos = savedPhotos.filter(p => !p.isExample);
+            }
+
+            lucide.createIcons();
+            renderHeader();
+            renderGallery();
+            renderAnnouncements();
+            updateClockAndBell();
+
+            setInterval(updateClockAndBell, 1000);
+            startSlideshowLoop();
+
+            // Slideshow Navigation
+            document.getElementById('prev-slide-btn').addEventListener('click', () => {
+                if (!appState.photos.length) return;
+                currentSlideIndex = (currentSlideIndex - 1 + appState.photos.length) % appState.photos.length;
+                slideProgress = 0; renderGallery();
+            });
+            document.getElementById('next-slide-btn').addEventListener('click', () => {
+                if (!appState.photos.length) return;
+                currentSlideIndex = (currentSlideIndex + 1) % appState.photos.length;
+                slideProgress = 0; renderGallery();
+            });
+            document.getElementById('toggle-play-btn').addEventListener('click', () => {
+                isPlaying = !isPlaying;
+                document.getElementById('play-pause-icon').setAttribute('data-lucide', isPlaying ? 'pause' : 'play');
+                lucide.createIcons();
+            });
+
+            // Password Gate for all 3 Header Buttons
+            const loginModal = document.getElementById('login-modal');
+            const passInput = document.getElementById('admin-password-input');
+            const loginError = document.getElementById('login-error-msg');
+            const titleMap = {
+                'admin': 'Yönetim Paneli Girişi',
+                'toggle-window': 'Pencere Boyutunu Değiştir',
+                'exit-app': 'Uygulamadan Çıkış Onayı'
+            };
+
+            document.querySelectorAll('[data-protected-action]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    pendingProtectedAction = btn.dataset.protectedAction;
+                    document.getElementById('login-modal-title').textContent = titleMap[pendingProtectedAction] || 'Öğretmen Yetki Doğrulaması';
+                    passInput.value = '';
+                    loginError.classList.add('hidden');
+                    loginModal.classList.remove('hidden');
+                    loginModal.classList.add('flex');
+                    setTimeout(() => passInput.focus(), 50);
+                });
+            });
+
+            const closeLogin = () => {
+                loginModal.classList.add('hidden');
+                loginModal.classList.remove('flex');
+                pendingProtectedAction = null;
+            };
+            document.getElementById('close-login-btn').addEventListener('click', closeLogin);
+            document.getElementById('cancel-login-btn').addEventListener('click', closeLogin);
+
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (passInput.value === appState.adminPassword) {
+                    const action = pendingProtectedAction;
+                    closeLogin();
+                    executeProtectedAction(action);
+                } else {
+                    loginError.classList.remove('hidden');
+                    passInput.select();
+                }
+            });
+
+            document.getElementById('close-admin-btn').addEventListener('click', () => {
+                document.getElementById('admin-modal').classList.add('hidden');
+                document.getElementById('admin-modal').classList.remove('flex');
+            });
+
+            // Admin Tabs
+            document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.admin-tab-btn').forEach(b => {
+                        b.className = "admin-tab-btn px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2";
+                    });
+                    btn.className = "admin-tab-btn active-tab px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold border-b-2 border-sky-400 text-sky-300 bg-sky-500/10 flex items-center gap-2";
+                    document.querySelectorAll('.admin-tab-panel').forEach(p => p.classList.add('hidden'));
+                    document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+                });
+            });
+
+            // Upload Photos to IndexedDB (Auto-clears example placeholders)
+            document.getElementById('photo-upload-input').addEventListener('change', async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                const customCaption = document.getElementById('new-photo-caption').value.trim();
+
+                for (const file of files) {
+                    const url = await compressImageFile(file);
+                    appState.photos.unshift({
+                        id: 'img-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                        url,
+                        caption: customCaption || file.name.replace(/\.[^/.]+$/, "")
+                    });
+                }
+                document.getElementById('new-photo-caption').value = '';
+                e.target.value = '';
+                currentSlideIndex = 0;
+                slideProgress = 0;
+                await saveState();
+                renderGallery();
+                renderAdminDashboard();
+                showAdminToast(`${files.length} fotoğraf eklendi!`);
+            });
+
+            document.getElementById('add-announcement-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const input = document.getElementById('new-announcement-input');
+                if (!input.value.trim()) return;
+                appState.announcements.unshift(input.value.trim());
+                input.value = '';
+                await saveState();
+                renderAnnouncements();
+                renderAdminDashboard();
+            });
+
+            document.getElementById('setting-logo-input').addEventListener('change', async (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                appState.schoolLogo = await compressImageFile(file, 256, 0.85);
+                await saveState();
+                renderHeader();
+                showAdminToast("Okul logosu güncellendi!");
+            });
+
+            document.getElementById('reset-logo-btn').addEventListener('click', async () => {
+                appState.schoolLogo = "";
+                await saveState();
+                renderHeader();
+                showAdminToast("Varsayılan armaya dönüldü.");
+            });
+
+            document.getElementById('apply-sim-time-btn').addEventListener('click', () => {
+                const val = document.getElementById('sim-time-input').value.trim();
+                const targetDow = Number(document.getElementById('sim-day-input').value);
+                if (!val) return;
+                if (!/^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
+                    showAdminToast("Saat biçimi SS:DD:SS olmalı (örn. 09:15:00).", true);
+                    return;
+                }
+                applySimulatedClock(targetDow, val);
+            });
+
+            document.querySelectorAll('[data-sim-preset]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const [dowStr, timeStr] = btn.dataset.simPreset.split('|');
+                    document.getElementById('sim-day-input').value = dowStr;
+                    document.getElementById('sim-time-input').value = timeStr;
+                    applySimulatedClock(Number(dowStr), timeStr);
+                });
+            });
+
+            document.getElementById('reset-sim-time-btn').addEventListener('click', () => {
+                simulatedBaseDate = null;
+                simulatedSetAt = null;
+                document.getElementById('test-time-banner').classList.add('hidden');
+                document.getElementById('test-time-banner').classList.remove('inline-flex');
+                updateClockAndBell();
+            });
+
+            document.getElementById('reset-bell-schedule-btn').addEventListener('click', () => {
+                document.getElementById('setting-bell-json').value = JSON.stringify(DEFAULT_BELL_SCHEDULE, null, 2);
+                showAdminToast("Varsayılan zil programı alana yüklendi. Kaydetmeyi unutmayın.");
+            });
+
+            document.getElementById('save-settings-btn').addEventListener('click', async () => {
+                const passField = document.getElementById('setting-admin-pass');
+                const typedPass = passField.value.trim();
+                if (typedPass && (typedPass === DEFAULT_ADMIN_PASS || typedPass.length < 4)) {
+                    showAdminToast("Yeni şifre en az 4 karakter olmalı ve 1234 olmamalı.", true);
+                    return;
+                }
+                if (!typedPass && appState.adminPassword === DEFAULT_ADMIN_PASS) {
+                    showAdminToast("Varsayılan şifre değiştirilmeden kaydedilemez. Yeni bir şifre girin.", true);
+                    passField.focus();
+                    return;
+                }
+
+                try {
+                    const parsedBell = JSON.parse(document.getElementById('setting-bell-json').value);
+                    if (!Array.isArray(parsedBell) || parsedBell.length < 2) throw new Error();
+                    appState.bellSchedule = parsedBell;
+                } catch {
+                    showAdminToast("Zil programı JSON formatı hatalı! Lütfen kontrol edin.", true);
+                    return;
+                }
+
+                appState.schoolName = document.getElementById('setting-school-name').value.trim() || "Atatürk Anadolu Lisesi";
+                appState.slideInterval = Math.max(3, Number(document.getElementById('setting-slide-interval').value) || 8);
+                appState.onScreenKeyboard = document.getElementById('setting-osk').checked;
+                if (typedPass) appState.adminPassword = typedPass;
+
+                await saveState();
+                passField.value = '';
+                enforcePasswordChange();
+                renderHeader();
+                updateClockAndBell();
+                showAdminToast("Tüm ayarlar ve zil programı kaydedildi!");
+            });
+        });
+    </script>
+
+    <!-- ==================== ON-SCREEN KEYBOARD (Turkish Q) ==================== -->
+    <script>
+    (function () {
+        'use strict';
+
+        const svg = (inner) => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+        const ICONS = {
+            bksp: svg('<path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>'),
+            shift: svg('<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'),
+            enter: svg('<polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>'),
+            hide: svg('<polyline points="6 9 12 15 18 9"/>')
+        };
+
+        const LETTERS = [
+            ['1','2','3','4','5','6','7','8','9','0'],
+            ['q','w','e','r','t','y','u','ı','o','p','ğ','ü'],
+            ['a','s','d','f','g','h','j','k','l','ş','i'],
+            ['{shift}','z','x','c','v','b','n','m','ö','ç','{bksp}']
+        ];
+        const SYMBOLS = [
+            ['1','2','3','4','5','6','7','8','9','0'],
+            ['@','#','$','%','&','*','(',')','-','_','+'],
+            ['=','/','\\','|','~','<','>','{','}','[',']'],
+            ['"',"'",':',';','!','?','{bksp}']
+        ];
+        const BOTTOM = ['{mode}', ',', '{space}', '.', '{enter}', '{hide}'];
+        const TEXT_TYPES = ['text', 'password', 'number', 'search', 'tel', 'email', 'url'];
+
+        const osk = document.createElement('div');
+        osk.id = 'osk';
+        osk.className = 'osk';
+        osk.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(osk);
+
+        let target = null;
+        let layer = 'abc';          // 'abc' | 'sym'
+        let shift = 'off';          // 'off' | 'once' | 'caps'
+        let repeatTimer = null, repeatInt = null, watch = null;
+
+        const enabled = () => typeof appState === 'undefined' || appState.onScreenKeyboard !== false;
+        const isTextTarget = (el) => !!el && !el.readOnly && !el.disabled &&
+            (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && TEXT_TYPES.includes(el.type)));
+        const isOpen = () => osk.classList.contains('open');
+        const fire = (el) => el.dispatchEvent(new Event('input', { bubbles: true }));
+        const charFor = (k) => (layer === 'abc' && shift !== 'off') ? k.toLocaleUpperCase('tr-TR') : k;
+
+        /* ---------- rendering ---------- */
+        function keyEl(k) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.tabIndex = -1;
+            b.className = 'osk-key';
+            b.dataset.k = k;
+            switch (k) {
+                case '{shift}':
+                    b.innerHTML = ICONS.shift; b.classList.add('wide');
+                    if (shift !== 'off') b.classList.add('on');
+                    if (shift === 'caps') b.classList.add('caps');
+                    break;
+                case '{bksp}':  b.innerHTML = ICONS.bksp;  b.classList.add('wide'); break;
+                case '{mode}':  b.textContent = layer === 'sym' ? 'ABC' : '?123'; b.classList.add('wide', 'accent'); break;
+                case '{space}': b.textContent = 'Boşluk'; b.classList.add('space'); break;
+                case '{enter}': b.innerHTML = ICONS.enter; b.classList.add('wide', 'accent'); break;
+                case '{hide}':  b.innerHTML = ICONS.hide;  b.classList.add('wide'); break;
+                default:        b.textContent = charFor(k);
+            }
+            return b;
+        }
+
+        function render() {
+            osk.textContent = '';
+            (layer === 'sym' ? SYMBOLS : LETTERS).concat([BOTTOM]).forEach((r) => {
+                const row = document.createElement('div');
+                row.className = 'osk-row';
+                r.forEach((k) => row.appendChild(keyEl(k)));
+                osk.appendChild(row);
+            });
+        }
+
+        /* ---------- text editing ---------- */
+        function insert(txt) {
+            const el = target;
+            if (el.type === 'number') {
+                if (!/^[0-9]$/.test(txt)) return;
+                el.value = (el.value || '') + txt;
+                fire(el);
+                return;
+            }
+            let s = el.selectionStart, e = el.selectionEnd;
+            if (typeof s !== 'number') { s = e = el.value.length; }
+            if (el.maxLength > 0 && el.value.length - (e - s) + txt.length > el.maxLength) return;
+            el.setRangeText(txt, s, e, 'end');
+            fire(el);
+        }
+
+        function backspace() {
+            const el = target;
+            if (!el) return;
+            if (el.type === 'number') {
+                el.value = String(el.value || '').slice(0, -1);
+                fire(el);
+                return;
+            }
+            let s = el.selectionStart, e = el.selectionEnd;
+            if (typeof s !== 'number') { s = e = el.value.length; }
+            if (s !== e) el.setRangeText('', s, e, 'end');
+            else if (s > 0) el.setRangeText('', s - 1, s, 'end');
+            else return;
+            fire(el);
+        }
+
+        function enter() {
+            const el = target;
+            if (el.tagName === 'TEXTAREA') { insert('\n'); return; }
+            if (el.form) {
+                el.form.requestSubmit();
+                setTimeout(check, 60);
+                return;
+            }
+            el.blur();   // fires 'change' (used by the caption editor)
+            close();
+        }
+
+        function press(k) {
+            if (!target || !document.contains(target)) { close(); return; }
+            switch (k) {
+                case '{shift}': shift = shift === 'off' ? 'once' : (shift === 'once' ? 'caps' : 'off'); render(); return;
+                case '{mode}':  layer = layer === 'abc' ? 'sym' : 'abc'; render(); return;
+                case '{bksp}':  backspace(); return;
+                case '{space}': insert(' '); return;
+                case '{enter}': enter(); return;
+                case '{hide}':  close(true); return;
+                default:
+                    insert(charFor(k));
+                    if (shift === 'once') { shift = 'off'; render(); }
+            }
+        }
+
+        /* ---------- open / close / layout ---------- */
+        function applyLayout() {
+            if (!isOpen()) return;
+            const h = osk.offsetHeight;
+            document.querySelectorAll('#login-modal, #admin-modal').forEach((m) => {
+                if (!m.classList.contains('hidden')) m.style.paddingBottom = (h + 12) + 'px';
+            });
+            const adminModal = document.getElementById('admin-modal');
+            const adminPanel = adminModal && adminModal.firstElementChild;
+            if (adminPanel && !adminModal.classList.contains('hidden')) adminPanel.style.height = '100%';
+            setTimeout(() => {
+                if (target && document.contains(target)) target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }, 60);
+        }
+
+        function resetLayout() {
+            document.querySelectorAll('#login-modal, #admin-modal').forEach((m) => { m.style.paddingBottom = ''; });
+            const adminModal = document.getElementById('admin-modal');
+            if (adminModal && adminModal.firstElementChild) adminModal.firstElementChild.style.height = '';
+        }
+
+        function check() {
+            if (!isOpen()) return;
+            if (!target || !document.contains(target) || target.getClientRects().length === 0) close();
+        }
+
+        function open(el) {
+            target = el;
+            if (!isOpen()) {
+                layer = 'abc';
+                shift = 'off';
+                render();
+                osk.classList.add('open');
+                watch = setInterval(check, 400);
+            }
+            requestAnimationFrame(applyLayout);
+        }
+
+        function close(blurActive) {
+            if (blurActive && isTextTarget(document.activeElement)) document.activeElement.blur();
+            osk.classList.remove('open');
+            target = null;
+            stopRepeat();
+            clearInterval(watch);
+            resetLayout();
+        }
+
+        /* ---------- backspace hold-to-repeat ---------- */
+        function stopRepeat() {
+            clearTimeout(repeatTimer);
+            clearInterval(repeatInt);
+            repeatTimer = repeatInt = null;
+        }
+
+        /* ---------- events ---------- */
+        osk.addEventListener('pointerdown', (e) => {
+            e.preventDefault();                       // keep focus in the input
+            const b = e.target.closest('.osk-key');
+            if (!b) return;
+            b.classList.add('pressed');
+            setTimeout(() => b.classList.remove('pressed'), 110);
+            const k = b.dataset.k;
+            press(k);
+            if (k === '{bksp}') {
+                stopRepeat();
+                repeatTimer = setTimeout(() => {
+                    repeatInt = setInterval(() => {
+                        if (target && document.contains(target)) backspace(); else stopRepeat();
+                    }, 55);
+                }, 380);
+            }
+        });
+        osk.addEventListener('mousedown', (e) => e.preventDefault());
+        osk.addEventListener('contextmenu', (e) => e.preventDefault());
+        window.addEventListener('pointerup', stopRepeat);
+        window.addEventListener('pointercancel', stopRepeat);
+        window.addEventListener('blur', stopRepeat);
+
+        document.addEventListener('focusin', (e) => {
+            const el = e.target;
+            if (osk.contains(el)) return;
+            if (isTextTarget(el) && enabled()) open(el);
+        });
+        document.addEventListener('focusout', () => {
+            setTimeout(() => { if (!isTextTarget(document.activeElement)) close(); }, 120);
+        });
+
+        window.addEventListener('resize', () => { if (isOpen()) applyLayout(); });
+    })();
+    </script>
+</body>
+</html>

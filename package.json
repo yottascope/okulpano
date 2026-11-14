@@ -1,0 +1,73 @@
+{
+  "name": "okul-pano-1",
+  "productName": "Okul Pano 1",
+  "version": "1.0.0",
+  "description": "Okul dijital pano uygulaması",
+  "homepage": "https://yottascope.com",
+  "author": {
+    "name": "Yottascope",
+    "email": "contact@yottascope.com"
+  },
+  "main": "main.js",
+  "scripts": {
+    "setup": "node setup.js && tailwindcss -i input.css -o vendor/tailwind.css --minify",
+    "start": "electron .",
+    "build:win": "npm run setup && electron-builder --win",
+    "build:linux": "npm run setup && electron-builder --linux"
+  },
+  "devDependencies": {
+    "@fontsource/jetbrains-mono": "^5.0.0",
+    "@fontsource/plus-jakarta-sans": "^5.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "lucide": "0.469.0",
+    "tailwindcss": "^3.4.0"
+  },
+  "build": {
+    "appId": "com.yottascope.okulpano",
+    "productName": "Okul Pano 1",
+    "copyright": "Copyright © 2026 Yottascope. Tüm hakları saklıdır.",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "icon.png",
+      "vendor/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.png",
+      "category": "Education",
+      "maintainer": "Yottascope <contact@yottascope.com>"
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}
